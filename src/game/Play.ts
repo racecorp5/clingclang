@@ -43,7 +43,7 @@ export class Play extends Phaser.State {
     this.game.load.image("button2", "assets/images/Button2.png");
     this.game.load.image("auto", "assets/images/Auto.png");
 
-    game.load.spritesheet('mummy', 'assets/imahes/Mummy.png', 37, 45, 18);
+    this.game.load.spritesheet('mummy', 'assets/images/Mummy.png', 37, 45, 18);
 
   }
 
@@ -118,8 +118,11 @@ export class Play extends Phaser.State {
         let peg = this.pegGroup.create(
           (this.gameSize.x / this.worldLevel.pegCols * col) - offset,
           (this.gameSize.y - yOffset) * row / this.worldLevel.pegRows - yOffset,
-          "peg"
+          'mummy'
         );
+        peg.animations.add('walk');
+        peg.animations.play('walk', 50, true);
+
         peg.anchor = { x: .5, y: .5 };
         peg.body.static = true;
         peg.body.setCollisionGroup(this.pegCollisionGroup);
