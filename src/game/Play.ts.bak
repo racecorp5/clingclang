@@ -1,0 +1,163 @@
+import { Game } from './game'
+import { Chip } from './Chip';
+import { worlds } from './game.config';
+import { GlobalVars } from '../providers/globalVars';
+import { Storage } from '@ionic/storage';
+
+export class Play extends Phaser.State {
+  chips: any[] = [];
+  pegs: any[] = [];
+  buckets: any[] = [];
+  borders: any[] = [];
+  worldLevel: any;
+  money: Phaser.Text;
+  chipCollisionGroup: any;
+  bucketCollisionGroup: any;
+  pegCollisionGroup: any;
+
+  constructor(public game: Game) {
+    super();
+  }
+
+  preload() {
+    this.game.load.image("chip1", "assets/images/chip1.png");
+    this.game.load.image("chip2", "assets/images/chip2.png");
+    this.game.load.image("peg1", "assets/images/peg1.png");
+    this.game.load.image("peg2", "assets/images/peg2.png");
+    this.worldLevel = worlds[0];//replace this with storage
+  }
+
+  create() {
+    this.game.camera.scale.set(1 / this.worldLevel.scale);
+    this.game.scale.scaleMode = Phaser.ScaleManager.USER_SCALE;
+
+    // Enable P2JS physics
+    this.game.physics.startSystem(Phaser.Physics.P2JS);
+    this.game.physics.p2.restitution = 0.9;
+    this.game.physics.p2.gravity.y = this.worldLevel.gravity;
+
+    //CollisionGroups
+    this.game.physics.p2.setImpactEvents(true);
+    this.chipCollisionGroup = this.game.physics.p2.createCollisionGroup();
+    this.bucketCollisionGroup = this.game.physics.p2.createCollisionGroup();
+    this.pegCollisionGroup = this.game.physics.p2.createCollisionGroup();
+    this.game.physics.p2.updateBoundsCollisionGroup();
+
+    //Create the objects
+    this.createBorder();
+    this.createPegs();
+    this.createBuckets();
+
+    this.input.onTap.add(this.createChip, this);
+
+    //money
+    var style = { font: "bold 32px Arial", fill: "#fff", boundsAlignH: "center", boundsAlignV: "middle" };
+    //  The Text is positioned at 0, 100
+    this.money = this.game.add.text(this.game.width - 60, 0, this.game.globalVars.getMoney(), style);
+    this.money.setShadow(3, 3, 'rgba(0,0,0,0.5)', 2);
+
+    //  We'll set the bounds to be from x0, y100 and be 800px wide by 100px high
+    this.money.setTextBounds(0, 100, 800, 100);
+  }
+
+  createChip() {
+    let chip = new Chip(this.game, this.input.position.x * this.worldLevel.scale, 20, "chip" + this.game.rnd.integerInRange(1, 2), 0, 10, this.worldLevel.scale);
+
+    chip.body.setCollisionGroup(this.chipCollisionGroup);
+    chip.body.collides(this.bucketCollisionGroup, this.hitBucket, this);
+    chip.body.collides(this.pegCollisionGroup, this.hitPeg, this);
+    chip.body.collides(this.chipCollisionGroup);
+
+    this.chips.push(chip);
+  }
+
+  createBorder() {
+    let spacer = 20;
+    let left = this.game.add.tileSprite(spacer, spacer, spacer, this.game.height, "wall");
+    let right = this.game.add.tileSprite(this.game.width - spacer, spacer, spacer, this.game.height, "wall");
+
+    this.game.physics.p2.enable([left, right]);
+    right.body.static = true;
+    left.body.static = true;
+  }
+
+  createPegs() {
+    let pegRows = this.worldLevel.pegRows;
+    for (let row = 1; row < pegRows + 1; row++) {
+      let pegCols = this.worldLevel.pegCols;
+      let offset = 0;
+      if (row % 2) {
+        pegCols = this.worldLevel.pegCols + 1;
+        offset = this.game.width / this.worldLevel.pegCols / 2;
+      }
+      for (let col = 1; col < pegCols; col++) {
+        let peg = this.game.add.sprite(
+          (this.game.width / this.worldLevel.pegCols * col) - offset,
+          (this.game.height / pegRows * row),
+          "peg"
+        );
+        peg.anchor.set(.5);
+
+        this.game.physics.enable(peg, Phaser.Physics.P2JS);
+        peg.body.static = true;
+        peg.body.setCollisionGroup(this.pegCollisionGroup);
+        peg.body.collides([this.chipCollisionGroup, this.pegCollisionGroup]);
+
+        //this.game.physics.enable(peg, Phaser.Physics.P2JS);
+        //peg.body.static = true;
+        //        this.pegs.push(peg);
+      }
+    }
+  }
+
+  createBuckets() {
+    for (let col = 1; col < this.worldLevel.pegCols; col++) {
+      let bucket = this.game.add.sprite(
+        (this.game.width / this.worldLevel.pegCols * col),
+        this.game.height,
+        "bucket"
+      );
+      bucket.anchor.set(.5);
+
+      this.game.physics.enable(bucket, Phaser.Physics.P2JS);
+      bucket.body.static = true;
+      bucket.body.setCollisionGroup(this.bucketCollisionGroup);
+      bucket.body.collides([this.chipCollisionGroup, this.bucketCollisionGroup]);
+
+      //      this.buckets.push(bucket);
+    }
+  }
+
+  update() {
+
+  }
+
+  hitBucket(chip, other) {
+    chip.sprite.destroy();
+    chip.destroy();
+
+    let addedMoney = 10000;
+    this.game.globalVars.addMoney(addedMoney);
+    this.money.setText(this.game.globalVars.getMoney());
+  }
+
+  hitPeg(chip, other) {
+    let addedMoney = 1;
+    this.game.globalVars.addMoney(addedMoney);
+    this.money.setText(this.game.globalVars.getMoney());
+  }
+
+  render() {
+    //debug helper
+    let chip = this.chips[this.chips.length - 1];
+    if (chip && chip.alive) {
+      //      this.game.debug.bodyInfo(chip, 32, 32);
+      //      this.game.debug.body(chip);
+      //this.game.debug.spriteInfo(chip, 32, 32);
+      //this.game.debug.spriteBounds(chip);
+    }
+    //this.game.debug.spriteBounds(this.pegs[10]);
+    //this.game.debug.geom(this.borders[0]);
+
+  }
+}
